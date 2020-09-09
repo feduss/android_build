@@ -376,3 +376,28 @@ class EdifyGenerator(object):
       data = open(input_path, "rb").read()
     common.ZipWriteStr(output_zip, "META-INF/com/google/android/update-binary",
                        data, perms=0o755)
+	
+  def MakeSymlinks(self, symlink_list):
+    """Create symlinks, given a list of (dest, link) pairs."""
+    by_dest = {}
+    for d, l in symlink_list:
+      by_dest.setdefault(d, []).append(l)
+
+    for dest, links in sorted(by_dest.iteritems()):
+      cmd = ('symlink("%s", ' % (dest,) +
+             ",\0".join(['"' + i + '"' for i in sorted(links)]) + ");")
+      self.script.append(self.WordWrap(cmd))
+		
+  def SetPermissions(self, fn, uid, gid, mode, selabel, capabilities):
+    """Set file ownership and permissions."""
+    if not self.info.get("use_set_metadata", False):
+      self.script.append('set_perm(%d, %d, 0%o, "%s");' % (uid, gid, mode, fn))
+    else:
+      cmd = 'set_metadata("%s", "uid", %d, "gid", %d, "mode", 0%o' \
+          % (fn, uid, gid, mode)
+      if capabilities is not None:
+        cmd += ', "capabilities", %s' % ( capabilities )
+      if selabel is not None:
+        cmd += ', "selabel", "%s"' % selabel
+      cmd += ');'
+      self.script.append(cmd)
